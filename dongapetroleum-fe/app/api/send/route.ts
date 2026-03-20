@@ -1,10 +1,8 @@
 import nodemailer from 'nodemailer';
-import { NextApiRequest, NextApiResponse } from 'next';
+import { NextRequest, NextResponse } from 'next/server';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-    if (req.method !== 'POST') return res.status(405).send('Method not allowed');
-
-    const { to, subject, customerName, messageContent } = req.body;
+export async function POST(req: NextRequest) {
+    const { to, subject, customerName, messageContent } = await req.json();
 
     const transporter = nodemailer.createTransport({
         pool: true,
@@ -60,12 +58,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     try {
         await transporter.sendMail(mailOptions);
-        return res.status(200).json({ success: true });
+        return NextResponse.json({ success: true }, { status: 200 });
     } catch (error: unknown) {
         let errorMessage = 'An unknown error occurred';
         if (error instanceof Error) {
             errorMessage = error.message;
         }
-        return res.status(500).json({ error: errorMessage });
+        return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 }
