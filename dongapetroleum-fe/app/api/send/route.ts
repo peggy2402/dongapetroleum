@@ -2,7 +2,12 @@ import nodemailer from 'nodemailer';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
-    const { to, subject, customerName, messageContent } = await req.json();
+    const formData = await req.formData();
+    const to = formData.get("to") as string;
+    const subject = formData.get("subject") as string;
+    const customerName = formData.get("customerName") as string;
+    const messageContent = formData.get("messageContent") as string;
+    const file = formData.get("attachment") as File | null;
 
     const transporter = nodemailer.createTransport({
         pool: true,
@@ -43,10 +48,20 @@ export async function POST(req: NextRequest) {
     </div>
     `;
 
+    const attachments = [];
+    if (file) {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        attachments.push({
+            filename: file.name,
+            content: buffer,
+        });
+    }
+
     const mailOptions = {
         from: `"Dầu Khí Đông Á" <${process.env.EMAIL_USER}>`,
         to: to,
         subject: subject,
+        attachments: attachments,
         html: `
       <div style="font-family: sans-serif; font-size: 15px;">
         <p>Kính gửi anh/chị <b>${customerName}</b>,</p>
