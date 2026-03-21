@@ -1,7 +1,9 @@
-export { default } from "next-auth/middleware";
+import { withAuth } from "next-auth/middleware";
 
-// Chỉ định những đường dẫn (routes) nào cần được bảo vệ
+// Khai báo hàm rõ ràng để trình biên dịch của Next.js (Turbopack) có thể nhận diện
+export default withAuth(function middleware(req) {
+});
+
 export const config = {
-    // Dấu * có nghĩa là bảo vệ trang /admin và TẤT CẢ các trang con bên trong nó (vd: /admin/tabs, /admin/email-tool)
     matcher: ["/admin/:path*"],
 };
