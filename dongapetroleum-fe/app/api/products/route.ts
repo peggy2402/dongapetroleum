@@ -23,7 +23,7 @@ export async function GET(request: Request) {
             db.collection("products").countDocuments(query),
             db.collection("products")
                 .find(query)
-                .sort({ order: 1, createdAt: -1 })
+                .sort({ createdAt: -1 })
                 .skip((page - 1) * limit)
                 .limit(limit)
                 .toArray()

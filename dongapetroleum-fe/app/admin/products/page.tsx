@@ -329,7 +329,7 @@ export default function AdminProducts() {
     // ==========================================
     // TÍNH NĂNG AUTO-FILL (TẢI MẪU BẢNG)
     // ==========================================
-    const loadTemplate = (type: "oil" | "grease" | "advanced" | "grease-complex" | "grease-lithium" | "basic" | "clear") => {
+    const loadTemplate = (type: "oil" | "grease" | "advanced" | "grease-complex" | "grease-lithium" | "shell-grease" | "basic" | "clear") => {
         if (type === "oil") {
             setCols([
                 { id: Date.now() + 1, main: "Density\nkg/L", subs: [] },
@@ -380,6 +380,16 @@ export default function AdminProducts() {
                 { id: Date.now() + 6, main: "NLGI Grade", subs: [] }
             ]);
             setRows([["-20 to 130", "Lithium", "200", "185", "13", "Mineral", "I"]]);
+        } else if (type === "shell-grease") {
+            setCols([
+                { id: Date.now() + 1, main: "Temperatures range, °C", subs: [] },
+                { id: Date.now() + 2, main: "Soap type", subs: [] },
+                { id: Date.now() + 3, main: "Dropping Point, °C", subs: [] },
+                { id: Date.now() + 4, main: "Kinematic Viscosity\ncSt", subs: ["cSt @ 40 ℃", "cSt @ 100 ℃"] },
+                { id: Date.now() + 5, main: "Cone Penetration, worked", subs: [] },
+                { id: Date.now() + 6, main: "Grade ISO", subs: [] }
+            ]);
+            setRows([["-10 to 180", "Inorganic Clay", "300", "460", "35", "265-295", "NLGI 2"]]);
         } else if (type === "basic") {
             setCols([{ id: Date.now() + 1, main: "Thuộc tính", subs: [] }, { id: Date.now() + 2, main: "Giá trị", subs: [] }]);
             setRows([["", ""]]);
@@ -467,7 +477,6 @@ export default function AdminProducts() {
                                 <th className="p-4 font-semibold">Mã SP</th>
                                 <th className="p-4 font-semibold">Tên Sản phẩm</th>
                                 <th className="p-4 font-semibold">Danh mục</th>
-                                <th className="p-4 font-semibold text-center w-24">Sắp xếp</th>
                                 <th className="p-4 font-semibold text-center">Trạng thái</th>
                                 <th className="p-4 font-semibold text-right">Thao tác</th>
                             </tr>
@@ -497,7 +506,6 @@ export default function AdminProducts() {
                                             {getCategoryName(prod.categoryId)}
                                         </span>
                                     </td>
-                                    <td className="p-4 text-center font-mono text-sm dark:text-gray-300">{prod.order}</td>
                                     <td className="p-4 text-center">
                                         <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
                                             prod.status === 'active' 
@@ -653,18 +661,12 @@ export default function AdminProducts() {
                                             <textarea rows={3} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Thông tin tóm tắt sản phẩm..." className="w-full rounded-lg border-gray-300 border p-2.5 text-sm dark:bg-zinc-950 dark:border-zinc-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-5 relative z-10">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sắp xếp</label>
-                                                <input type="number" value={formData.order} onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) })} className="w-full rounded-lg border-gray-300 border p-2.5 text-sm dark:bg-zinc-950 dark:border-zinc-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-                                            </div>
-                                            <div>
+                                        <div className="w-full md:w-1/2 relative z-10">
                                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Trạng thái</label>
                                                 <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value as any })} className="w-full rounded-lg border-gray-300 border p-2.5 text-sm dark:bg-zinc-950 dark:border-zinc-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
                                                     <option value="active">Hiển thị</option>
                                                     <option value="inactive">Đang ẩn</option>
                                                 </select>
-                                            </div>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-5 pt-4 mt-2 border-t border-gray-100 dark:border-zinc-800 relative z-10">
@@ -706,6 +708,7 @@ export default function AdminProducts() {
                                                             <button type="button" onClick={() => loadTemplate('advanced')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-zinc-700 border-t border-gray-100 dark:border-zinc-700 transition-colors">🧪 Mẫu Phức Hợp</button>
                                                             <button type="button" onClick={() => loadTemplate('grease-complex')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-zinc-700 border-t border-gray-100 dark:border-zinc-700 transition-colors">⚙️ Mẫu Mỡ Lithium Complex</button>
                                                             <button type="button" onClick={() => loadTemplate('grease-lithium')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-zinc-700 border-t border-gray-100 dark:border-zinc-700 transition-colors">⚙️ Mẫu Mỡ LUBEX</button>
+                                                            <button type="button" onClick={() => loadTemplate('shell-grease')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-zinc-700 border-t border-gray-100 dark:border-zinc-700 transition-colors">🐚 Mẫu Mỡ Shell</button>
                                                             <button type="button" onClick={() => loadTemplate('basic')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-zinc-700 border-t border-gray-100 dark:border-zinc-700 transition-colors">📑 Mẫu 2 cột cơ bản</button>
                                                             <button type="button" onClick={() => loadTemplate('clear')} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 border-t border-gray-100 dark:border-zinc-700 transition-colors">🗑️ Xóa trắng bảng</button>
                                                         </div>
