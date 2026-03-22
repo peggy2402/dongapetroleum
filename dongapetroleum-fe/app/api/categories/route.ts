@@ -31,13 +31,16 @@ export async function GET(request: Request) {
         if (status) query.status = status;
         if (search) query.name = { $regex: search, $options: "i" }; // Tìm kiếm tương đối, không phân biệt hoa thường
 
-        const total = await db.collection("categories").countDocuments(query);
-        const categories = await db.collection("categories")
-            .find(query)
-            .sort({ order: 1 })
-            .skip((page - 1) * limit)
-            .limit(limit)
-            .toArray();
+        // Tối ưu tốc độ: Chạy song song truy vấn đếm và truy vấn dữ liệu
+        const [total, categories] = await Promise.all([
+            db.collection("categories").countDocuments(query),
+            db.collection("categories")
+                .find(query)
+                .sort({ order: 1 })
+                .skip((page - 1) * limit)
+                .limit(limit)
+                .toArray()
+        ]);
 
         const formattedCategories = categories.map(cat => ({ ...cat, id: cat._id.toString(), _id: undefined }));
 
