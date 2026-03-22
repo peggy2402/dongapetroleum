@@ -1,11 +1,48 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Category } from "@/models/Category";
+import { Product } from "@/models/Product";
 
 export default function Home() {
   const [isLangModalOpen, setIsLangModalOpen] = useState(false);
   const [selectedLang, setSelectedLang] = useState("vi");
+
+  // State lưu dữ liệu từ API
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchHomeData = async () => {
+      setIsLoading(true);
+      try {
+        // Lấy danh mục (Chỉ lấy danh mục đang hiển thị)
+        const catRes = await fetch("/api/categories?all=true&status=active");
+        if (catRes.ok) {
+            const catData = await catRes.json();
+            // Ưu tiên hiển thị các danh mục gốc (không có parentId) ra trang chủ
+            setCategories(catData.filter((c: Category) => !c.parentId).slice(0, 4));
+        }
+
+        // Lấy sản phẩm
+        const prodRes = await fetch("/api/products?limit=20&status=active");
+        if (prodRes.ok) {
+            const prodData = await prodRes.json();
+            const allProds = prodData.data || [];
+            // Lọc ra các sản phẩm được đánh dấu Nổi bật hoặc Mới
+            const featured = allProds.filter((p: Product) => p.isFeatured || p.isNewProduct);
+            setFeaturedProducts(featured.length > 0 ? featured.slice(0, 8) : allProds.slice(0, 8));
+        }
+      } catch (error) {
+        console.error("Lỗi tải dữ liệu trang chủ:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchHomeData();
+  }, []);
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-900 font-sans flex flex-col">
@@ -53,15 +90,92 @@ export default function Home() {
               <a href="#lien-he" className="px-8 py-3.5 border border-transparent text-base font-bold rounded-full text-white bg-blue-700 hover:bg-blue-800 md:text-lg transition-colors shadow-md">
                 Nhận Báo Giá
               </a>
-              <a href="#gioi-thieu" className="px-8 py-3.5 border border-gray-300 dark:border-zinc-600 text-base font-medium rounded-full text-gray-700 dark:text-gray-200 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 md:text-lg transition-colors">
-                Tìm hiểu thêm
+              <a href="#san-pham" className="px-8 py-3.5 border border-gray-300 dark:border-zinc-600 text-base font-medium rounded-full text-gray-700 dark:text-gray-200 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 md:text-lg transition-colors">
+                Xem Sản phẩm
               </a>
             </div>
           </div>
         </div>
 
-        {/* Khu vực Nội dung (Tương lai nơi render Nội dung Tabs) */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        {/* Khối Danh mục sản phẩm nổi bật */}
+        <div id="danh-muc" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="flex justify-between items-end mb-10">
+            <div>
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white relative inline-block">
+                Lĩnh vực Kinh doanh
+                <span className="absolute -bottom-2 left-0 w-1/2 h-1 bg-blue-600 rounded-full"></span>
+              </h2>
+            </div>
+            <Link href="/categories" className="text-blue-600 hover:text-blue-800 dark:text-blue-400 font-medium flex items-center gap-1">
+              Xem tất cả <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
+            </Link>
+          </div>
+
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[1,2,3,4].map(i => <div key={i} className="h-64 bg-gray-200 dark:bg-zinc-800 animate-pulse rounded-2xl"></div>)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {categories.map(cat => (
+                <Link href={`/${cat.slug}`} key={cat.id} className="group relative h-64 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all block">
+                  <img src={cat.image || "/default-categories-img.jpg"} alt={cat.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-gray-900/90 via-gray-900/40 to-transparent"></div>
+                  <div className="absolute bottom-0 left-0 right-0 p-6">
+                    <h3 className="text-xl font-bold text-white mb-1 group-hover:text-blue-400 transition-colors">{cat.name}</h3>
+                    <p className="text-gray-300 text-sm line-clamp-2">{cat.description}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Khối Sản phẩm chiến lược / Mới */}
+        <div id="san-pham" className="bg-gray-50 dark:bg-zinc-900/50 py-16 border-y border-gray-100 dark:border-zinc-800">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Sản phẩm Nổi bật</h2>
+              <p className="mt-3 text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">Khám phá các dòng sản phẩm dầu nhớt và hóa chất chất lượng cao được tin dùng nhất.</p>
+            </div>
+
+            {isLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[1,2,3,4,5,6,7,8].map(i => <div key={i} className="h-80 bg-gray-200 dark:bg-zinc-800 animate-pulse rounded-2xl"></div>)}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {featuredProducts.map(prod => (
+                  <div key={prod.id} className="bg-white dark:bg-zinc-800 rounded-2xl shadow-sm hover:shadow-lg transition-all border border-gray-100 dark:border-zinc-700 overflow-hidden flex flex-col group">
+                    <div className="relative h-48 overflow-hidden bg-gray-100 dark:bg-zinc-900 flex items-center justify-center p-4">
+                      <img src={prod.image || "/default-categories-img.jpg"} alt={prod.name} className="max-h-full object-contain group-hover:scale-105 transition-transform duration-300" />
+                      {/* Badges */}
+                      <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+                        {prod.isNewProduct && <span className="px-2 py-1 bg-green-500 text-white text-xs font-bold rounded shadow-sm">MỚI</span>}
+                        {prod.isFeatured && <span className="px-2 py-1 bg-amber-500 text-white text-xs font-bold rounded shadow-sm">HOT</span>}
+                      </div>
+                    </div>
+                    <div className="p-5 flex-1 flex flex-col">
+                      <div className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-1 truncate">
+                        {categories.find(c => c.id === prod.categoryId)?.name || "Chưa phân loại"}
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
+                        <Link href={`/san-pham/${prod.slug}`}>{prod.name}</Link>
+                      </h3>
+                      <p className="text-gray-500 dark:text-gray-400 text-sm line-clamp-2 mb-4 flex-1">{prod.description}</p>
+                      <Link href={`/san-pham/${prod.slug}`} className="w-full text-center py-2.5 bg-gray-50 dark:bg-zinc-700 text-gray-700 dark:text-gray-200 font-medium rounded-lg hover:bg-blue-600 hover:text-white transition-colors border border-gray-200 dark:border-zinc-600 hover:border-blue-600">
+                        Xem chi tiết
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Khu vực Tại sao chọn chúng tôi (Giữ lại từ bản gốc) */}
+        <div id="gioi-thieu" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Tại sao chọn Đông Á Petroleum?</h2>
             <div className="mt-3 w-24 h-1 bg-blue-600 mx-auto rounded-full"></div>
