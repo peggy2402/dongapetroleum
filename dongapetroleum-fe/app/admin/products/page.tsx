@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Product } from "@/models/Product";
 import { Category } from "@/models/Category";
+import { Editor } from '@tinymce/tinymce-react';
 
 export default function AdminProducts() {
     const [products, setProducts] = useState<Product[]>([]);
@@ -24,6 +25,12 @@ export default function AdminProducts() {
     const [catSearchTerm, setCatSearchTerm] = useState("");
     const [showCatSuggestions, setShowCatSuggestions] = useState(false);
     
+    // STATE SIÊU CẤP CHO BẢNG LƯỚI ĐỘNG (THAY THẾ TINYMCE)
+    const [cols, setCols] = useState<{id: number, main: string, subs: string[]}[]>([
+        { id: 1, main: "Thuộc tính", subs: [] }, { id: 2, main: "Giá trị", subs: [] }
+    ]);
+    const [rows, setRows] = useState<string[][]>([["", ""]]);
+
     const [formData, setFormData] = useState({
         id: "",
         code: "",
@@ -33,13 +40,9 @@ export default function AdminProducts() {
         image: "",
         description: "",
         content: "",
-        specificGravity: "",
-        pourPoint: "",
-        flashPoint: "",
-        viscosity40: "",
-        viscosity100: "",
-        viscosityIndex: "",
-        viscosityGrade: "",
+        specsContent: "", // Trống rỗng để đón trình soạn thảo Word
+        isFeatured: false,
+        isNewProduct: false,
         msds: "",
         pds: "",
         tags: "",
@@ -58,6 +61,13 @@ export default function AdminProducts() {
         fetchCategories(); // Lấy tất cả danh mục 1 lần
     }, []);
 
+    // Tự động đồng bộ Lưới Excel vào Database (Dạng JSON)
+    useEffect(() => {
+        if (isModalOpen) {
+            setFormData(prev => ({ ...prev, specsContent: JSON.stringify({ cols, rows }) }));
+        }
+    }, [cols, rows, isModalOpen]);
+
     const fetchProducts = async (searchQuery = searchTerm) => {
         try {
             const query = new URLSearchParams({
@@ -74,7 +84,13 @@ export default function AdminProducts() {
             console.error("Lỗi khi tải sản phẩm:", error);
         }
     };
-
+    // Hàm lấy tên đầy đủ của danh mục (Bao gồm cả danh mục cha nếu có)
+    const getFullCategoryName = (cat: Category) => {
+        if (cat.parentId) {
+            return `${cat.name} (${getParentCategoryName(cat.parentId)})`;
+        }
+        return cat.name;
+    };
     const fetchCategories = async () => {
         try {
             const res = await fetch("/api/categories?all=true", { cache: "no-store" });
@@ -108,12 +124,16 @@ export default function AdminProducts() {
             id: "",
             code: "PRD" + Math.floor(10000 + Math.random() * 90000),
             name: "", slug: "", categoryId: "", image: "", description: "", content: "",
-            specificGravity: "", pourPoint: "", flashPoint: "", viscosity40: "", 
-            viscosity100: "", viscosityIndex: "", viscosityGrade: "", msds: "", pds: "", tags: "",
+            specsContent: "",
+            isFeatured: false,
+            isNewProduct: false,
+            msds: "", pds: "", tags: "",
             order: products.length + 1,
             status: "active", seoTitle: "", seoDescription: ""
         });
         setCatSearchTerm("");
+        setCols([{ id: 1, main: "Thuộc tính", subs: [] }, { id: 2, main: "Giá trị", subs: [] }]);
+        setRows([["", ""]]);
         setIsModalOpen(true);
         setActiveTab("general");
     };
@@ -128,13 +148,9 @@ export default function AdminProducts() {
             image: prod.image || "",
             description: prod.description || "",
             content: prod.content || "",
-            specificGravity: prod.specificGravity || "",
-            pourPoint: prod.pourPoint || "",
-            flashPoint: prod.flashPoint || "",
-            viscosity40: prod.viscosity40 || "",
-            viscosity100: prod.viscosity100 || "",
-            viscosityIndex: prod.viscosityIndex || "",
-            viscosityGrade: prod.viscosityGrade || "",
+            specsContent: prod.specsContent || "",
+            isFeatured: prod.isFeatured || false,
+            isNewProduct: prod.isNewProduct || false,
             msds: prod.msds || "",
             pds: prod.pds || "",
             tags: prod.tags || "",
@@ -146,6 +162,16 @@ export default function AdminProducts() {
 
         const cat = categories.find(c => c.id === prod.categoryId);
         setCatSearchTerm(cat ? cat.name : "");
+        
+        try {
+            if (prod.specsContent) {
+                const parsed = JSON.parse(prod.specsContent);
+                if (parsed.cols && parsed.rows) { setCols(parsed.cols); setRows(parsed.rows); }
+                else { setCols([{ id: 1, main: "Thuộc tính", subs: [] }, { id: 2, main: "Giá trị", subs: [] }]); setRows([["", ""]]); }
+            } else { setCols([{ id: 1, main: "Thuộc tính", subs: [] }, { id: 2, main: "Giá trị", subs: [] }]); setRows([["", ""]]); }
+        } catch {
+            setCols([{ id: 1, main: "Thuộc tính", subs: [] }, { id: 2, main: "Giá trị", subs: [] }]); setRows([["", ""]]);
+        }
 
         setIsModalOpen(true);
         setActiveTab("general");
@@ -224,6 +250,13 @@ export default function AdminProducts() {
         return cat ? cat.name : <span className="text-red-500 text-xs">Chưa chọn DM</span>;
     };
 
+    // Hàm lấy tên danh mục cha để hiển thị trong Dropdown
+    const getParentCategoryName = (parentId: string | null) => {
+        if (!parentId) return null;
+        const parent = categories.find(c => c.id === parentId);
+        return parent ? parent.name : "Không xác định";
+    };
+
     const highlightText = (text: string, highlight: string) => {
         if (!highlight.trim() || !text) return text;
         const regex = new RegExp(`(${highlight})`, 'gi');
@@ -231,6 +264,148 @@ export default function AdminProducts() {
         return parts.map((part, i) => 
             regex.test(part) ? <mark key={i} className="bg-yellow-300 dark:bg-yellow-600/60 text-gray-900 dark:text-white rounded px-0.5">{part}</mark> : <span key={i}>{part}</span>
         );
+    };
+
+    // ==========================================
+    // CÁC HÀM XỬ LÝ LƯỚI EXCEL (BẢNG THÔNG SỐ)
+    // ==========================================
+    const addCol = () => {
+        setCols([...cols, { id: Date.now(), main: "", subs: [] }]);
+        setRows(rows.map(r => [...r, ""]));
+    };
+
+    const removeCol = (index: number) => {
+        if (cols.length <= 1) return alert("Phải có ít nhất 1 cột!");
+        const colToRemove = cols[index];
+        const removeCount = Math.max(1, colToRemove.subs.length);
+        let startIdx = 0;
+        for(let i=0; i<index; i++) startIdx += Math.max(1, cols[i].subs.length);
+        setCols(cols.filter((_, i) => i !== index));
+        setRows(rows.map(r => { const newR = [...r]; newR.splice(startIdx, removeCount); return newR; }));
+    };
+
+    const addSub = (colIndex: number) => {
+        const newCols = [...cols]; const col = newCols[colIndex];
+        if (col.subs.length === 0) {
+            col.subs = ["", ""];
+            let startIdx = 0;
+            for(let i=0; i<=colIndex; i++) startIdx += Math.max(1, cols[i].subs.length);
+            setRows(rows.map(r => { const newR = [...r]; newR.splice(startIdx - 1, 0, ""); return newR; }));
+        } else {
+            col.subs.push("");
+            let startIdx = 0;
+            for(let i=0; i<=colIndex; i++) startIdx += Math.max(1, cols[i].subs.length);
+            setRows(rows.map(r => { const newR = [...r]; newR.splice(startIdx - 1, 0, ""); return newR; }));
+        }
+        setCols(newCols);
+    };
+
+    const removeSub = (colIndex: number, subIndex: number) => {
+        const newCols = [...cols]; const col = newCols[colIndex];
+        let physicalIdx = 0;
+        for(let i=0; i<colIndex; i++) physicalIdx += Math.max(1, cols[i].subs.length);
+        physicalIdx += subIndex;
+        col.subs.splice(subIndex, 1);
+        setCols(newCols);
+        setRows(rows.map(r => {
+            const newR = [...r]; newR.splice(physicalIdx, 1);
+            if (col.subs.length === 0) newR.splice(physicalIdx, 0, "");
+            return newR;
+        }));
+    };
+
+    const updateMain = (colIndex: number, val: string) => {
+        const newCols = [...cols]; newCols[colIndex].main = val; setCols(newCols);
+    };
+
+    const updateSub = (colIndex: number, subIndex: number, val: string) => {
+        const newCols = [...cols]; newCols[colIndex].subs[subIndex] = val; setCols(newCols);
+    };
+
+    const updateCell = (rowIndex: number, physicalColIndex: number, val: string) => {
+        const newRows = [...rows]; newRows[rowIndex][physicalColIndex] = val; setRows(newRows);
+    };
+
+    // ==========================================
+    // TÍNH NĂNG AUTO-FILL (TẢI MẪU BẢNG)
+    // ==========================================
+    const loadTemplate = (type: "oil" | "grease" | "advanced" | "grease-complex" | "grease-lithium" | "basic" | "clear") => {
+        if (type === "oil") {
+            setCols([
+                { id: Date.now() + 1, main: "Density\nkg/L", subs: [] },
+                { id: Date.now() + 2, main: "Pour Point\n°C", subs: [] },
+                { id: Date.now() + 3, main: "Flash Point, °C", subs: [] },
+                { id: Date.now() + 4, main: "Kinematic Viscosity\ncSt", subs: ["cSt @ 40 ℃", "cSt @ 100 ℃"] },
+                { id: Date.now() + 5, main: "Viscosity\nIndex", subs: [] },
+                { id: Date.now() + 6, main: "Grade\nISO", subs: [] }
+            ]);
+            setRows([["", "", "", "", "", "", ""]]); // 7 ô trống do cột Kinematic có 2 cột con
+        } else if (type === "grease") {
+            setCols([
+                { id: Date.now() + 1, main: "Temperature range,ºC", subs: [] },
+                { id: Date.now() + 2, main: "Thickener", subs: [] },
+                { id: Date.now() + 3, main: "Dropping Point,°C", subs: [] },
+                { id: Date.now() + 4, main: "Worked penetration", subs: ["Min", "Max"] },
+                { id: Date.now() + 5, main: "Base oil", subs: [] },
+                { id: Date.now() + 6, main: "NLGI Grade", subs: [] }
+            ]);
+            setRows([["-5 to 125", "Lithium", "185", "220", "250", "Mineral", "3"]]);
+        } else if (type === "advanced") {
+            setCols([
+                { id: Date.now() + 1, main: "Density @", subs: [] },
+                { id: Date.now() + 2, main: "Pour Point, °C", subs: [] },
+                { id: Date.now() + 3, main: "Worked Cone Penetration", subs: [] },
+                { id: Date.now() + 4, main: "Copper Corrossion(T2 copper,100℃,24h)", subs: ["PB", "PD"] },
+                { id: Date.now() + 5, main: "Seperation Capacity,volume fraction(100℃,24h)", subs: [] },
+                { id: Date.now() + 6, main: "Grade ISO", subs: [] }
+            ]);
+            setRows([["", "310", "282", "784", "1.960", "1,68", ""]]);
+        } else if (type === "grease-complex") {
+            setCols([
+                { id: Date.now() + 1, main: "Temperature range, ºC", subs: [] },
+                { id: Date.now() + 2, main: "4 Ball Weld Point, Kg", subs: [] },
+                { id: Date.now() + 3, main: "Dropping Point, °C", subs: [] },
+                { id: Date.now() + 4, main: "Base Oil Viscosity", subs: ["cSt @ 40 ℃", "cSt @ 100 ℃"] },
+                { id: Date.now() + 5, main: "Base Oil", subs: [] },
+                { id: Date.now() + 6, main: "Thickener", subs: [] }
+            ]);
+            setRows([["-30 to 160", "310", "260", "180", "", "Mineral", "Lithium Complex"]]);
+        } else if (type === "grease-lithium") {
+            setCols([
+                { id: Date.now() + 1, main: "Operating temp,°C", subs: [] },
+                { id: Date.now() + 2, main: "Thickener", subs: [] },
+                { id: Date.now() + 3, main: "Dropping Point,°C", subs: [] },
+                { id: Date.now() + 4, main: "Kinematic Viscosity", subs: ["cSt @ 40 ℃", "cSt @ 100 ℃"] },
+                { id: Date.now() + 5, main: "Base oil", subs: [] },
+                { id: Date.now() + 6, main: "NLGI Grade", subs: [] }
+            ]);
+            setRows([["-20 to 130", "Lithium", "200", "185", "13", "Mineral", "I"]]);
+        } else if (type === "basic") {
+            setCols([{ id: Date.now() + 1, main: "Thuộc tính", subs: [] }, { id: Date.now() + 2, main: "Giá trị", subs: [] }]);
+            setRows([["", ""]]);
+        } else if (type === "clear") {
+            if (confirm("Bạn có chắc muốn xóa toàn bộ bảng hiện tại?")) {
+                setCols([{ id: Date.now(), main: "Cột 1", subs: [] }]);
+                setRows([[""]]);
+            }
+        }
+    };
+    // ==========================================
+
+    // Cấu hình thanh công cụ Word (TinyMCE)
+    const editorInitConfig = {
+        height: 500,
+        menubar: 'file edit view insert format tools table help', // Bật menu Table chuyên dụng
+        plugins: [
+            'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+            'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+            'insertdatetime', 'media', 'table', 'help', 'wordcount'
+        ],
+        toolbar: 'undo redo | blocks | ' +
+            'bold italic forecolor backcolor | alignleft aligncenter alignright alignjustify | ' +
+            'table tabledelete | tableprops tablerowprops tablecellprops | ' +
+            'bullist numlist outdent indent | removeformat | help',
+        content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size:14px }'
     };
 
     return (
@@ -310,7 +485,11 @@ export default function AdminProducts() {
                                     </td>
                                     <td className="p-4 text-sm font-medium text-gray-500 dark:text-gray-400">{prod.code}</td>
                                     <td className="p-4 font-semibold text-gray-900 dark:text-white">
-                                        {highlightText(prod.name, searchTerm)}
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            {highlightText(prod.name, searchTerm)}
+                                            {prod.isFeatured && <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">Nổi bật</span>}
+                                            {prod.isNewProduct && <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider bg-green-100 text-green-700 border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">Mới</span>}
+                                        </div>
                                         <div className="text-xs text-gray-400 font-normal mt-0.5 hidden md:block">/{prod.slug}</div>
                                     </td>
                                     <td className="p-4 text-sm text-gray-700 dark:text-gray-300">
@@ -432,10 +611,20 @@ export default function AdminProducts() {
                                                     </div>
                                                     {showCatSuggestions && (
                                                         <ul className="absolute bottom-full mb-1 left-0 right-0 z-[9999] w-full bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.3)] max-h-60 overflow-auto divide-y divide-gray-100 dark:divide-zinc-700 animate-in fade-in slide-in-from-bottom-2 duration-200">
-                                                            {categories.filter(cat => cat.name.toLowerCase().includes(catSearchTerm.toLowerCase())).length > 0 ? (
-                                                                categories.filter(cat => cat.name.toLowerCase().includes(catSearchTerm.toLowerCase())).map(cat => (
-                                                                    <li key={cat.id} className="px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-zinc-700 cursor-pointer transition-colors" onClick={() => { setFormData({ ...formData, categoryId: cat.id }); setCatSearchTerm(cat.name); setShowCatSuggestions(false); }}>
+                                                            {categories.filter(cat => getFullCategoryName(cat).toLowerCase().includes(catSearchTerm.toLowerCase())).length > 0 ? (
+                                                                categories.filter(cat => getFullCategoryName(cat).toLowerCase().includes(catSearchTerm.toLowerCase())).map(cat => (
+                                                                    <li key={cat.id} className="px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-zinc-700 cursor-pointer transition-colors" onMouseDown={(e) => { 
+                                                                        e.preventDefault(); // Ngăn ô input mất tiêu điểm
+                                                                        setFormData({ ...formData, categoryId: cat.id }); 
+                                                                        setCatSearchTerm(getFullCategoryName(cat)); setShowCatSuggestions(false); 
+                                                                    }}>
                                                                         <div className="text-sm font-medium text-gray-900 dark:text-white">{highlightText(cat.name, catSearchTerm)}</div>
+                                                                        {cat.parentId && (
+                                                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+                                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path></svg>
+                                                                                Thuộc: {highlightText(getParentCategoryName(cat.parentId) || "", catSearchTerm)}
+                                                                            </div>
+                                                                        )}
                                                                     </li>
                                                                 ))
                                                             ) : (
@@ -477,43 +666,110 @@ export default function AdminProducts() {
                                                 </select>
                                             </div>
                                         </div>
+
+                                        <div className="grid grid-cols-2 gap-5 pt-4 mt-2 border-t border-gray-100 dark:border-zinc-800 relative z-10">
+                                            <label className="flex items-center gap-3 cursor-pointer group">
+                                                <input type="checkbox" checked={formData.isFeatured} onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })} className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 transition-all cursor-pointer" />
+                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-amber-600 transition-colors">🔥 Đánh dấu là Sản phẩm Nổi bật</span>
+                                            </label>
+                                            <label className="flex items-center gap-3 cursor-pointer group">
+                                                <input type="checkbox" checked={formData.isNewProduct} onChange={(e) => setFormData({ ...formData, isNewProduct: e.target.checked })} className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 transition-all cursor-pointer" />
+                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-green-600 transition-colors">✨ Đánh dấu là Sản phẩm Mới</span>
+                                            </label>
+                                        </div>
                                     </div>
                                 )}
 
                                 {activeTab === "specs" && (
-                                    <div className="space-y-5 animate-in slide-in-from-right-2 duration-300">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    <div className="space-y-4 animate-in slide-in-from-right-2 duration-300">
+                                        <div className="flex justify-between items-end mb-2">
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cấp độ nhớt (Viscosity Grade)</label>
-                                                <input type="text" value={formData.viscosityGrade} onChange={(e) => setFormData({ ...formData, viscosityGrade: e.target.value })} className="w-full rounded-lg border-gray-300 border p-2.5 text-sm dark:bg-zinc-950 dark:border-zinc-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                    Bảng Thông số kỹ thuật (Giao diện Excel Động)
+                                                </label>
+                                                <span className="text-xs text-gray-500 block mt-1">
+                                                    Tự do gõ: Bấm nút <strong className="text-blue-500 px-1 bg-blue-50 rounded">[+]</strong> trên mỗi cột để "Lồng thêm cột con" y hệt yêu cầu!
+                                                </span>
                                             </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Chỉ số nhớt (Viscosity Index)</label>
-                                                <input type="text" value={formData.viscosityIndex} onChange={(e) => setFormData({ ...formData, viscosityIndex: e.target.value })} className="w-full rounded-lg border-gray-300 border p-2.5 text-sm dark:bg-zinc-950 dark:border-zinc-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Độ nhớt 40°C</label>
-                                                <input type="text" value={formData.viscosity40} onChange={(e) => setFormData({ ...formData, viscosity40: e.target.value })} className="w-full rounded-lg border-gray-300 border p-2.5 text-sm dark:bg-zinc-950 dark:border-zinc-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Độ nhớt 100°C</label>
-                                                <input type="text" value={formData.viscosity100} onChange={(e) => setFormData({ ...formData, viscosity100: e.target.value })} className="w-full rounded-lg border-gray-300 border p-2.5 text-sm dark:bg-zinc-950 dark:border-zinc-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Trọng lượng riêng</label>
-                                                <input type="text" value={formData.specificGravity} onChange={(e) => setFormData({ ...formData, specificGravity: e.target.value })} className="w-full rounded-lg border-gray-300 border p-2.5 text-sm dark:bg-zinc-950 dark:border-zinc-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Điểm đổ (°C)</label>
-                                                <input type="text" value={formData.pourPoint} onChange={(e) => setFormData({ ...formData, pourPoint: e.target.value })} className="w-full rounded-lg border-gray-300 border p-2.5 text-sm dark:bg-zinc-950 dark:border-zinc-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Điểm chớp cháy / Điểm sáng (°C)</label>
-                                                <input type="text" value={formData.flashPoint} onChange={(e) => setFormData({ ...formData, flashPoint: e.target.value })} className="w-full rounded-lg border-gray-300 border p-2.5 text-sm dark:bg-zinc-950 dark:border-zinc-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                                            <div className="flex gap-2 flex-wrap justify-end">
+                                                {/* Nút Auto-fill */}
+                                                <div className="relative group inline-block">
+                                                    <button type="button" className="px-3 py-1.5 bg-amber-50 text-amber-600 rounded text-sm font-medium hover:bg-amber-100 transition-colors border border-amber-200 flex items-center gap-1">
+                                                        <span>✨ Auto-fill Mẫu</span>
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                    </button>
+                                                    {/* Lớp bọc tàng hình (pt-1) làm "Cầu nối" để giữ chuột không bị rớt */}
+                                                    <div className="absolute right-0 top-full pt-1 w-48 hidden group-hover:block z-50">
+                                                        <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-xl overflow-hidden">
+                                                            <button type="button" onClick={() => loadTemplate('oil')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors">🛢️ Mẫu Dầu Nhớt</button>
+                                                            <button type="button" onClick={() => loadTemplate('grease')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-zinc-700 border-t border-gray-100 dark:border-zinc-700 transition-colors">⚙️ Mẫu Mỡ Bôi Trơn</button>
+                                                            <button type="button" onClick={() => loadTemplate('advanced')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-zinc-700 border-t border-gray-100 dark:border-zinc-700 transition-colors">🧪 Mẫu Phức Hợp</button>
+                                                            <button type="button" onClick={() => loadTemplate('grease-complex')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-zinc-700 border-t border-gray-100 dark:border-zinc-700 transition-colors">⚙️ Mẫu Mỡ Lithium Complex</button>
+                                                            <button type="button" onClick={() => loadTemplate('grease-lithium')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-zinc-700 border-t border-gray-100 dark:border-zinc-700 transition-colors">⚙️ Mẫu Mỡ LUBEX</button>
+                                                            <button type="button" onClick={() => loadTemplate('basic')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-zinc-700 border-t border-gray-100 dark:border-zinc-700 transition-colors">📑 Mẫu 2 cột cơ bản</button>
+                                                            <button type="button" onClick={() => loadTemplate('clear')} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 border-t border-gray-100 dark:border-zinc-700 transition-colors">🗑️ Xóa trắng bảng</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button type="button" onClick={addCol} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200">+ Thêm cột</button>
+                                                <button type="button" onClick={() => setRows([...rows, Array(cols.reduce((sum, c) => sum + Math.max(1, c.subs.length), 0)).fill("")])} className="px-3 py-1.5 bg-green-50 text-green-600 rounded text-sm font-medium hover:bg-green-100 transition-colors border border-green-200">+ Thêm hàng</button>
                                             </div>
                                         </div>
-                                        <hr className="border-gray-200 dark:border-zinc-800 my-4" />
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+                                        <div className="overflow-x-auto border border-gray-300 dark:border-zinc-700 rounded-lg shadow-sm">
+                                            <table className="w-full text-center border-collapse min-w-max">
+                                                <thead>
+                                                    <tr className="bg-gray-100 dark:bg-zinc-800 border-b border-gray-300 dark:border-zinc-700">
+                                                        {cols.map((c, i) => (
+                                                            <th key={c.id} rowSpan={cols.some(c => c.subs.length > 0) && c.subs.length === 0 ? 2 : 1} colSpan={Math.max(1, c.subs.length)} className="border-r border-gray-300 dark:border-zinc-700 p-2 relative group min-w-[150px]">
+                                                                <div className="flex items-center justify-center gap-1">
+                                                                    <input value={c.main} onChange={(e) => updateMain(i, e.target.value)} placeholder="Tên cột chính..." className="w-full bg-transparent text-center font-bold text-gray-800 dark:text-gray-200 outline-none focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-blue-500 rounded px-1 py-1 transition-all" />
+                                                                    <div className="opacity-0 group-hover:opacity-100 flex flex-col gap-1 absolute right-2 top-2">
+                                                                        <button type="button" onClick={() => addSub(i)} title="Chia lồng cột con" className="w-5 h-5 flex items-center justify-center bg-blue-500 text-white rounded hover:bg-blue-600 text-xs font-bold shadow">+</button>
+                                                                        {cols.length > 1 && <button type="button" onClick={() => removeCol(i)} title="Xóa toàn bộ cột này" className="w-5 h-5 flex items-center justify-center bg-red-500 text-white rounded hover:bg-red-600 text-xs font-bold shadow">x</button>}
+                                                                    </div>
+                                                                </div>
+                                                            </th>
+                                                        ))}
+                                                        <th rowSpan={cols.some(c => c.subs.length > 0) ? 2 : 1} className="w-16 bg-gray-50 dark:bg-zinc-800/80 border-b border-gray-300 dark:border-zinc-700"></th>
+                                                    </tr>
+                                                    {cols.some(c => c.subs.length > 0) && (
+                                                        <tr className="bg-gray-50 dark:bg-zinc-800/60 border-b border-gray-300 dark:border-zinc-700">
+                                                            {cols.map((c, i) => {
+                                                                if (c.subs.length === 0) return null;
+                                                                return c.subs.map((sub, sIdx) => (
+                                                                    <th key={sIdx} className="border-r border-t border-gray-300 dark:border-zinc-700 p-1.5 relative group min-w-[100px]">
+                                                                        <div className="flex items-center justify-center">
+                                                                            <input value={sub} onChange={(e) => updateSub(i, sIdx, e.target.value)} placeholder="Tên cột con..." className="w-full bg-transparent text-center text-sm font-semibold text-gray-600 dark:text-gray-400 outline-none focus:bg-white dark:focus:bg-zinc-900 focus:ring-2 focus:ring-blue-500 rounded px-1 py-1 transition-all" />
+                                                                            <button type="button" onClick={() => removeSub(i, sIdx)} title="Xóa cột con" className="opacity-0 group-hover:opacity-100 absolute right-1 w-4 h-4 flex items-center justify-center bg-red-100 text-red-600 rounded hover:bg-red-200 text-xs font-bold">x</button>
+                                                                        </div>
+                                                                    </th>
+                                                                ));
+                                                            })}
+                                                        </tr>
+                                                    )}
+                                                </thead>
+                                                <tbody className="bg-white dark:bg-zinc-900 divide-y divide-gray-200 dark:divide-zinc-800">
+                                                    {rows.map((row, rIdx) => (
+                                                        <tr key={rIdx} className="hover:bg-blue-50/50 dark:hover:bg-zinc-800/50 transition-colors">
+                                                            {row.map((cell, cIdx) => (
+                                                                <td key={cIdx} className="p-0 border-r border-gray-200 dark:border-zinc-800">
+                                                                    <input value={cell} onChange={(e) => updateCell(rIdx, cIdx, e.target.value)} placeholder="-" className="w-full py-3 text-center text-sm bg-transparent outline-none focus:bg-white dark:focus:bg-zinc-950 focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-gray-200 transition-all" />
+                                                                </td>
+                                                            ))}
+                                                            <td className="p-0 text-center bg-gray-50 dark:bg-zinc-800/50">
+                                                                <button type="button" onClick={() => { const newRows = [...rows]; newRows.splice(rIdx, 1); setRows(newRows); }} className="w-full h-full p-3 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Xóa hàng này">
+                                                                    <svg className="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {/* Phần đính kèm Tài liệu */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4 pt-4 border-t border-gray-100 dark:border-zinc-800">
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tài liệu MSDS (Link/Đường dẫn)</label>
                                                 <input type="text" value={formData.msds} onChange={(e) => setFormData({ ...formData, msds: e.target.value })} placeholder="https://..." className="w-full rounded-lg border-gray-300 border p-2.5 text-sm dark:bg-zinc-950 dark:border-zinc-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none" />
@@ -530,14 +786,14 @@ export default function AdminProducts() {
                                     <div className="space-y-5 animate-in slide-in-from-right-2 duration-300 h-full flex flex-col">
                                         <div className="flex-1">
                                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Bài viết mô tả chi tiết sản phẩm (Hỗ trợ HTML)</label>
-                                            <textarea 
-                                                rows={15} 
-                                                value={formData.content}
-                                                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                                                placeholder="<p>Sản phẩm này là...</p>" 
-                                                className="w-full h-[400px] rounded-lg border-gray-300 border font-mono p-4 text-sm dark:bg-zinc-950 dark:border-zinc-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none leading-relaxed"
-                                            ></textarea>
-                                            <p className="text-xs text-gray-500 mt-2">Sau này có thể tích hợp thư viện Editor (như CKEditor hoặc TinyMCE) vào ô này.</p>
+                                            <div className="border border-gray-300 dark:border-zinc-700 rounded-lg overflow-hidden">
+                                                <Editor
+                                                    apiKey={process.env.TINYMCE_API_KEY}
+                                                    init={editorInitConfig}
+                                                    value={formData.content}
+                                                    onEditorChange={(content) => setFormData({ ...formData, content: content })}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 )}

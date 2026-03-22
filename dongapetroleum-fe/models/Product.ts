@@ -10,14 +10,12 @@ export interface Product {
     order: number;          // Sắp xếp
     status: "active" | "inactive"; // Trạng thái
     
-    // Thông số kỹ thuật chuyên ngành Dầu Khí
-    specificGravity: string; // Trọng lượng riêng
-    pourPoint: string;       // Điểm đổ
-    flashPoint: string;      // Điểm sáng / chớp cháy
-    viscosity40: string;     // Độ nhớt 40
-    viscosity100: string;    // Độ nhớt 100
-    viscosityIndex: string;  // Chỉ số nhớt
-    viscosityGrade: string;  // Cấp độ nhớt
+    // Nhãn nổi bật / Mới
+    isFeatured: boolean;     // Sản phẩm nổi bật
+    isNewProduct: boolean;   // Sản phẩm mới
+
+    // Bảng thông số kỹ thuật (Lưu dưới dạng HTML được vẽ từ trình soạn thảo giống Word)
+    specsContent: string;
 
     // Tài liệu đính kèm
     msds: string;            // Link tải MSDS

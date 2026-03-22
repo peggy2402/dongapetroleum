@@ -272,7 +272,10 @@ export default function AdminCategories() {
                                         <li 
                                             key={cat.id} 
                                             className="px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-zinc-700 cursor-pointer transition-colors"
-                                            onClick={() => handleSuggestionClick(cat.name)}
+                                            onMouseDown={(e) => { 
+                                                e.preventDefault(); // Ngăn ô input mất tiêu điểm
+                                                handleSuggestionClick(cat.name); 
+                                            }}
                                         >
                                             <div className="text-sm font-medium text-gray-900 dark:text-white">
                                                 {highlightText(cat.name, searchTerm)}
@@ -527,7 +530,11 @@ export default function AdminCategories() {
                                                                     <li 
                                                                         key={cat.id} 
                                                                         className="px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-zinc-700 cursor-pointer transition-colors"
-                                                                        onClick={() => { setFormData({ ...formData, parentId: cat.id }); setParentSearchTerm(cat.name); setShowParentSuggestions(false); }}
+                                                                        onMouseDown={(e) => { 
+                                                                            e.preventDefault(); // Ngăn ô input mất tiêu điểm
+                                                                            setFormData({ ...formData, parentId: cat.id }); 
+                                                                            setParentSearchTerm(cat.name); setShowParentSuggestions(false); 
+                                                                        }}
                                                                     >
                                                                         <div className="text-sm font-medium text-gray-900 dark:text-white">
                                                                             {highlightText(cat.name, parentSearchTerm)}
