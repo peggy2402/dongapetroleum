@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     siteName: "Dong A Petroleum",
     images: [
       {
-        url: "/og-image.jpg", // Bạn cần đưa 1 bức ảnh tên og-image.jpg vào thư mục /public
+        url: "/og-image.png", // Bạn cần đưa 1 bức ảnh tên og-image.jpg vào thư mục /public
         width: 1200,
         height: 630,
         alt: "Dong A Petroleum Hero Image",
